@@ -1,0 +1,1 @@
+WINDOWMIN = int((os.getenv("POST_WINDOW_MIN") or "70").strip())

@@ -17,5 +17,5 @@ jobs:
       - env:
           FEED_URLS: ${{ secrets.FEED_URLS }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          POST_WINDOW_MIN: ${{ vars.POST_WINDOW_MIN }}
+          POST_WINDOW_MIN: ${{ secrets.POST_WINDOW_MIN }}
         run: python rss_to_slack.py
