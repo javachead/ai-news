@@ -1,89 +1,31 @@
 ﻿name: AI記事要約配信
 
 on:
-  schedule:
-    - cron: "30 */3 * * *"
   workflow_dispatch:
 
-concurrency:
-  group: ai-news
-  cancel-in-progress: true
-
 jobs:
-  ai-summarize:
+  test:
     runs-on: ubuntu-latest
     steps:
-      - name: リポジトリをチェックアウト
-        uses: actions/checkout@v4
-
-      - name: Python環境をセットアップ
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: 依存関係をインストール
+      - uses: actions/checkout@v4
+      
+      - name: ファイル確認
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: ファイル確認（事前チェック）
-        run: |
-          echo "=== ファイル一覧 ==="
+          echo "=== 基本確認 ==="
+          pwd
           ls -la
-          echo "=== ai_rss_summarizer.py 存在確認 ==="
-          if [ -f "ai_rss_summarizer.py" ]; then
-            echo "ファイル存在: OK"
-            echo "ファイルサイズ: $(wc -l ai_rss_summarizer.py)"
-            echo "ファイル内容の先頭10行:"
-            head -10 ai_rss_summarizer.py
-          else
-            echo "エラー: ai_rss_summarizer.py が見つかりません"
-            echo "現在のディレクトリ: $(pwd)"
-            echo "Python関連ファイル:"
-            find . -name "*.py" -type f
-          fi
+          echo "=== Pythonファイル検索 ==="
+          find . -name "*.py" -type f
 
-      - name: Python構文チェック
+      - name: Python実行テスト
         run: |
-          echo "=== Python構文チェック ==="
-          python -m py_compile ai_rss_summarizer.py 2>&1 || echo "構文エラーあり"
+          echo "=== Python実行テスト ==="
+          python ai_rss_summarizer.py
 
-      - name: Slack接続テスト
+      - name: Slack通知
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
-          python - <<'PY'
-          import os, requests
-          print("🤖 AI記事要約bot稼働中...")
-          r = requests.post(os.environ["SLACK_WEBHOOK_URL"], json={"text":"🤖 AI記事要約bot稼働中"})
-          print("status:", r.status_code, r.text[:200])
-          PY
-
-      - name: 環境変数確認
-        env:
-          AI_FEED_URLS: ${{ secrets.AI_FEED_URLS }}
-          HUGGINGFACE_API_KEY: ${{ secrets.HF_TOKEN }}
-          POST_WINDOW_MIN: ${{ secrets.POST_WINDOW_MIN_AI }}
-          MAX_POSTS: ${{ secrets.MAX_POSTS_AI }}
-          DRY_RUN: ${{ secrets.DRY_RUN }}
-        run: |
-          echo "=== 環境変数確認 ==="
-          echo "AI_FEED_URLS length: ${#AI_FEED_URLS}"
-          echo "HUGGINGFACE_API_KEY length: ${#HUGGINGFACE_API_KEY}"
-          echo "POST_WINDOW_MIN: $POST_WINDOW_MIN"
-          echo "MAX_POSTS: $MAX_POSTS"
-          echo "DRY_RUN: $DRY_RUN"
-
-      - name: AI記事要約システムを実行
-        env:
-          AI_FEED_URLS: ${{ secrets.AI_FEED_URLS }}
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          HUGGINGFACE_API_KEY: ${{ secrets.HF_TOKEN }}
-          COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
-          POST_WINDOW_MIN: ${{ secrets.POST_WINDOW_MIN_AI }}
-          MAX_POSTS: ${{ secrets.MAX_POSTS_AI }}
-          DRY_RUN: ${{ secrets.DRY_RUN }}
-        run: |
-          echo "=== スクリプト実行開始 ==="
-          python ai_rss_summarizer.py 2>&1 || echo "スクリプト実行エラー: 終了コード $?"
-          echo "=== スクリプト実行完了 ==="
+          curl -X POST -H 'Content-type: application/json' \
+            --data '{"text":"🔍 新しいテストワークフロー実行完了！"}' \
+            $SLACK_WEBHOOK_URL
