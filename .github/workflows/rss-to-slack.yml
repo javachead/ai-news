@@ -2,7 +2,7 @@
 
 on:
   schedule:
-    - cron: "30 */3 * * *"  # 3時間おきの30分（UTC: 0:30, 3:30, 6:30, 9:30...）
+    - cron: "30 */3 * * *"
   workflow_dispatch:
 
 concurrency:
@@ -26,7 +26,29 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Slack接続テスト（AI記事要約）
+      - name: ファイル確認（事前チェック）
+        run: |
+          echo "=== ファイル一覧 ==="
+          ls -la
+          echo "=== ai_rss_summarizer.py 存在確認 ==="
+          if [ -f "ai_rss_summarizer.py" ]; then
+            echo "ファイル存在: OK"
+            echo "ファイルサイズ: $(wc -l ai_rss_summarizer.py)"
+            echo "ファイル内容の先頭10行:"
+            head -10 ai_rss_summarizer.py
+          else
+            echo "エラー: ai_rss_summarizer.py が見つかりません"
+            echo "現在のディレクトリ: $(pwd)"
+            echo "Python関連ファイル:"
+            find . -name "*.py" -type f
+          fi
+
+      - name: Python構文チェック
+        run: |
+          echo "=== Python構文チェック ==="
+          python -m py_compile ai_rss_summarizer.py 2>&1 || echo "構文エラーあり"
+
+      - name: Slack接続テスト
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
@@ -36,6 +58,21 @@ jobs:
           r = requests.post(os.environ["SLACK_WEBHOOK_URL"], json={"text":"🤖 AI記事要約bot稼働中"})
           print("status:", r.status_code, r.text[:200])
           PY
+
+      - name: 環境変数確認
+        env:
+          AI_FEED_URLS: ${{ secrets.AI_FEED_URLS }}
+          HUGGINGFACE_API_KEY: ${{ secrets.HF_TOKEN }}
+          POST_WINDOW_MIN: ${{ secrets.POST_WINDOW_MIN_AI }}
+          MAX_POSTS: ${{ secrets.MAX_POSTS_AI }}
+          DRY_RUN: ${{ secrets.DRY_RUN }}
+        run: |
+          echo "=== 環境変数確認 ==="
+          echo "AI_FEED_URLS length: ${#AI_FEED_URLS}"
+          echo "HUGGINGFACE_API_KEY length: ${#HUGGINGFACE_API_KEY}"
+          echo "POST_WINDOW_MIN: $POST_WINDOW_MIN"
+          echo "MAX_POSTS: $MAX_POSTS"
+          echo "DRY_RUN: $DRY_RUN"
 
       - name: AI記事要約システムを実行
         env:
@@ -47,5 +84,6 @@ jobs:
           MAX_POSTS: ${{ secrets.MAX_POSTS_AI }}
           DRY_RUN: ${{ secrets.DRY_RUN }}
         run: |
-          echo "Debug: AI_FEED_URLS = $AI_FEED_URLS"
-          python ai_rss_summarizer.py
+          echo "=== スクリプト実行開始 ==="
+          python ai_rss_summarizer.py 2>&1 || echo "スクリプト実行エラー: 終了コード $?"
+          echo "=== スクリプト実行完了 ==="
