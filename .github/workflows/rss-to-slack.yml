@@ -37,13 +37,17 @@ jobs:
           print("status:", r.status_code, r.text[:200])
           PY
 
-      - name: AI記事要約システムを実行
+            - name: AI記事要約システムを実行
         env:
           AI_FEED_URLS: ${{ secrets.AI_FEED_URLS }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           HUGGINGFACE_API_KEY: ${{ secrets.HF_TOKEN }}
           COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
-          POST_WINDOW_MIN: ${{ secrets.POST_WINDOW_MIN_AI }}
-          MAX_POSTS: ${{ secrets.MAX_POSTS_AI }}
+          POST_WINDOW_MIN_AI: ${{ secrets.POST_WINDOW_MIN_AI }}
+          MAX_POSTS_AI: ${{ secrets.MAX_POSTS_AI }}
           DRY_RUN: ${{ secrets.DRY_RUN }}
-        run: python ai_rss_summarizer.py
+          run: |
+          echo "Debug: Environment check"
+          echo "AI_FEED_URLS length: ${#AI_FEED_URLS}"
+          echo "Starting script..."
+          python ai_rss_summarizer.py || echo "Script failed with exit code $?"
