@@ -1,9 +1,4 @@
-# AI-NEWS システム依存関係
-
-# RSS解析とHTTP通信
 feedparser==6.0.11
 requests==2.32.3
 python-dateutil==2.9.0.post0
-
-# AI要約機能（無料APIアクセス用）
 openai>=1.0.0
