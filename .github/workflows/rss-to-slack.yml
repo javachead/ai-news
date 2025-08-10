@@ -4,28 +4,113 @@ on:
   workflow_dispatch:
 
 jobs:
-  test:
+  detailed-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
-      - name: ファイル確認
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 依存関係をインストール
         run: |
-          echo "=== 基本確認 ==="
-          pwd
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 環境変数とファイル詳細確認
+        env:
+          AI_FEED_URLS: ${{ secrets.AI_FEED_URLS }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          POST_WINDOW_MIN_AI: ${{ secrets.POST_WINDOW_MIN_AI }}
+          MAX_POSTS_AI: ${{ secrets.MAX_POSTS_AI }}
+          DRY_RUN: ${{ secrets.DRY_RUN }}
+        run: |
+          echo "=== 詳細システム情報 ==="
+          echo "現在時刻: $(date)"
+          echo "Python版本: $(python --version)"
+          echo "pip版本: $(pip --version)"
+          echo ""
+          echo "=== ファイル情報 ==="
           ls -la
-          echo "=== Pythonファイル検索 ==="
-          find . -name "*.py" -type f
+          echo ""
+          echo "=== 環境変数情報 ==="
+          echo "AI_FEED_URLS長さ: ${#AI_FEED_URLS}"
+          echo "HF_TOKEN長さ: ${#HF_TOKEN}"
+          echo "POST_WINDOW_MIN_AI: $POST_WINDOW_MIN_AI"
+          echo "MAX_POSTS_AI: $MAX_POSTS_AI"
+          echo "DRY_RUN: $DRY_RUN"
 
-      - name: Python実行テスト
+      - name: RSS フィード接続テスト
+        env:
+          AI_FEED_URLS: ${{ secrets.AI_FEED_URLS }}
         run: |
-          echo "=== Python実行テスト ==="
-          python ai_rss_summarizer.py
+          python - <<'EOF'
+          import os
+          import requests
+          import feedparser
+          from datetime import datetime
+          
+          feeds = os.getenv('AI_FEED_URLS', '').split(',')
+          print(f"=== RSS フィード接続テスト ===")
+          print(f"テストするフィード数: {len(feeds)}")
+          
+          for i, url in enumerate(feeds, 1):
+              url = url.strip()
+              if not url:
+                  continue
+              print(f"\n[{i}] テスト中: {url}")
+              try:
+                  # HTTP接続テスト
+                  resp = requests.get(url, timeout=10)
+                  print(f"    HTTP ステータス: {resp.status_code}")
+                  
+                  # RSS解析テスト
+                  feed = feedparser.parse(url)
+                  entries = len(feed.entries)
+                  print(f"    記事数: {entries}")
+                  
+                  if entries > 0:
+                      latest = feed.entries[0]
+                      title = latest.get('title', 'タイトルなし')[:50]
+                      pub_date = latest.get('published', '日付なし')
+                      print(f"    最新記事: {title}...")
+                      print(f"    公開日: {pub_date}")
+              except Exception as e:
+                  print(f"    エラー: {e}")
+          EOF
 
-      - name: Slack通知
+      - name: Hugging Face API接続テスト
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          python - <<'EOF'
+          import os
+          import requests
+          
+          token = os.getenv('HF_TOKEN', '')
+          print("=== Hugging Face API接続テスト ===")
+          if not token:
+              print("HF_TOKEN が設定されていません")
+          else:
+              print(f"トークン長さ: {len(token)}")
+              try:
+                  headers = {"Authorization": f"Bearer {token}"}
+                  # 簡単なAPIテスト
+                  resp = requests.get("https://huggingface.co/api/whoami", headers=headers, timeout=10)
+                  print(f"API認証ステータス: {resp.status_code}")
+                  if resp.status_code == 200:
+                      print("✅ Hugging Face API認証成功")
+                  else:
+                      print(f"❌ API認証失敗: {resp.text[:100]}")
+              except Exception as e:
+                  print(f"API接続エラー: {e}")
+          EOF
+
+      - name: 詳細結果をSlackに送信
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
           curl -X POST -H 'Content-type: application/json' \
-            --data '{"text":" 新しいテストワークフロー実行完了！"}' \
+            --data '{"text":"🔍 **詳細テスト完了**\n• システム情報: ✅\n• RSS接続: テスト実行\n• HF API: テスト実行\n• 詳細はActionsログを確認してください"}' \
             $SLACK_WEBHOOK_URL
