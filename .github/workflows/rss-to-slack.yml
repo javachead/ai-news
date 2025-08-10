@@ -47,11 +47,5 @@ jobs:
           MAX_POSTS: ${{ secrets.MAX_POSTS_AI }}
           DRY_RUN: ${{ secrets.DRY_RUN }}
         run: |
-          echo "=== デバッグ情報 ==="
-          echo "AI_FEED_URLS: $AI_FEED_URLS"
-          echo "DRY_RUN: $DRY_RUN"
-          echo "POST_WINDOW_MIN: $POST_WINDOW_MIN"
-          echo "MAX_POSTS: $MAX_POSTS"
-          echo "=== スクリプト実行開始 ==="
-          python ai_rss_summarizer.py 2>&1 || echo "スクリプトエラー: 終了コード $?"
-          echo "=== スクリプト実行完了 ==="
+          echo "Debug: AI_FEED_URLS = $AI_FEED_URLS"
+          python ai_rss_summarizer.py
