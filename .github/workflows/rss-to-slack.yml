@@ -10,12 +10,30 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install -r requirements.txt
-      - env:
+
+      - name: Install deps
+        run: python -m pip install --upgrade pip && pip install -r requirements.txt
+
+      # Webhookの疎通テスト（まずはこれでSlackに届くか確認）
+      - name: Slack ping (debug)
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          python - <<'PY'
+          import os, requests
+          print("ping to slack...")
+          r = requests.post(os.environ["SLACK_WEBHOOK_URL"], json={"text":"(debug) bot is alive"})
+          print("status:", r.status_code, r.text[:200])
+          PY
+
+      # 本処理
+      - name: Run rss_to_slack
+        env:
           FEED_URLS: ${{ secrets.FEED_URLS }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          POST_WINDOW_MIN: ${{ secrets.POST_WINDOW_MIN }}
+          POST_WINDOW_MIN: ${{ secrets.POST_WINDOW_MIN }} 
         run: python rss_to_slack.py
