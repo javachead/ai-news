@@ -1,68 +1,21 @@
-﻿import os, re, sys, time
-import requests, feedparser
-from datetime import datetime, timedelta, timezone
-from dateutil import parser as dateparser
+﻿name: RSS to Slack (hourly)
 
-FEED_URLS = os.getenv("FEED_URLS", "")
-WEBHOOK   = os.getenv("SLACK_WEBHOOK_URL", "")
-WINDOWMIN = int(os.getenv("POST_WINDOW_MIN", "70"))
+on:
+  schedule:
+    - cron: "0 * * * *"  # 毎時0分（UTC）
+  workflow_dispatch:
 
-if not FEED_URLS or not WEBHOOK:
-    print("FEED_URLS と SLACK_WEBHOOK_URL を設定してください。", file=sys.stderr)
-    sys.exit(1)
-
-UTC = timezone.utc
-
-def strip_html(s: str) -> str:
-    if not s: return ""
-    s = re.sub(r"<[^>]+>", " ", s)
-    s = re.sub(r"&nbsp;?", " ", s)
-    return re.sub(r"\s+", " ", s).strip()
-
-def parse_pubdate(entry):
-    for key in ("published_parsed", "updated_parsed"):
-        t = getattr(entry, key, None) if hasattr(entry, key) else entry.get(key)
-        if t: return datetime(*t[:6], tzinfo=UTC)
-    for key in ("published", "updated", "created"):
-        s = entry.get(key)
-        if s:
-            try:
-                dt = dateparser.parse(s)
-                if not dt.tzinfo: dt = dt.replace(tzinfo=UTC)
-                return dt.astimezone(UTC)
-            except Exception:
-                pass
-    return None
-
-def post_to_slack(text: str) -> bool:
-    try:
-        r = requests.post(WEBHOOK, json={"text": text}, timeout=20)
-        if 200 <= r.status_code < 300: return True
-        print(f"Slack post failed: {r.status_code} {r.text}", file=sys.stderr)
-    except Exception as e:
-        print(f"Slack post error: {e}", file=sys.stderr)
-    return False
-
-now = datetime.now(UTC)
-cutoff = now - timedelta(minutes=WINDOWMIN)
-posted = 0
-
-for url in [u.strip() for u in FEED_URLS.split(",") if u.strip()]:
-    try:
-        feed = feedparser.parse(url)
-        for entry in feed.entries:
-            pub = parse_pubdate(entry)
-            if not pub or pub < cutoff: continue
-            title = entry.get("title") or "(no title)"
-            link  = entry.get("link") or ""
-            summary = strip_html(entry.get("summary") or entry.get("description") or "")
-            text = f"*New:* {title}\n{link}"
-            if summary:
-                text += f"\n{summary[:300]}{'…' if len(summary) > 300 else ''}"
-            if post_to_slack(text):
-                posted += 1
-                time.sleep(0.3)
-    except Exception as e:
-        print(f"Feed error: {url} -> {e}", file=sys.stderr)
-
-print(f"Posted: {posted}")
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - env:
+          FEED_URLS: ${{ secrets.FEED_URLS }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          POST_WINDOW_MIN: ${{ vars.POST_WINDOW_MIN }}
+        run: python rss_to_slack.py
